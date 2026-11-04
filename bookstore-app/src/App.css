@@ -1,0 +1,92 @@
+.payment-result-card {
+  animation: payment-result-enter 450ms ease-out both;
+}
+
+.payment-result-icon {
+  position: relative;
+  isolation: isolate;
+  animation: payment-result-icon-enter 550ms 100ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.payment-result-icon::before {
+  position: absolute;
+  inset: -7px;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  content: "";
+  opacity: 0;
+  animation: payment-result-ring 750ms 160ms ease-out both;
+}
+
+.payment-result-mark {
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: payment-result-mark-draw 550ms 480ms cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+.payment-result-mark-second {
+  animation-delay: 620ms;
+}
+
+@keyframes payment-result-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes payment-result-icon-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) rotate(-12deg);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.08) rotate(3deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes payment-result-ring {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.28);
+  }
+}
+
+@keyframes payment-result-mark-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-result-card,
+  .payment-result-icon,
+  .payment-result-mark {
+    animation: none;
+  }
+
+  .payment-result-icon::before {
+    animation: none;
+  }
+
+  .payment-result-mark {
+    stroke-dashoffset: 0;
+  }
+}
