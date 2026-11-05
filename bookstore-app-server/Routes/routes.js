@@ -71,6 +71,12 @@ router.post(
   bookController.verifyPaymentController,
 );
 
+router.post(
+  "/books-ai",
+  authMiddleWare,
+  bookController.genarateBookAbstractController,
+);
+
 // ------------------admin----------------------
 
 router.get(

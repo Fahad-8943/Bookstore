@@ -69,3 +69,7 @@ export const editBookStatusAPI = async (id) => {
 export const getAllUserAPI = async () => {
   return await apiService("GET", "/all-users", {});
 };
+
+export const bookAbstractAPI = async (title) => {
+  return await apiService("POST", `/books-ai`, {title});
+};

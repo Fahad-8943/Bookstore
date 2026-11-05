@@ -11,12 +11,14 @@ import { faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import axiosInstance from "../../api/axiosInstance";
 import {
   addBookAPI,
+  bookAbstractAPI,
   getBoughtBooksAPI,
   getUserBooksAPI,
   removeBookAPI,
 } from "../../services/allApi";
 import { toast } from "react-toastify";
 import EditProfile from "../components/EditProfile";
+import useDebounce from "../../hooks/useDebounce";
 
 function Profile() {
   const [sellBookStatus, setSellBookStatus] = useState(true);
@@ -25,6 +27,9 @@ function Profile() {
   const [user, setUser] = useState(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [isAddingBook, setIsAddingBook] = useState(false);
+  const [bookAbstract, setBookAbstract] = useState("");
+  const [isGeneratingAbstract, setIsGeneratingAbstract] = useState(false);
+  const [bookTitle, setBookTitle] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [uploadedImagePreviews, setUploadedImagePreviews] = useState([]);
   const [uploadedImages, setUploadedImages] = useState([]);
@@ -37,14 +42,60 @@ function Profile() {
   const [isLoadingBoughtBooks, setIsLoadingBoughtBooks] = useState(true);
   const [boughtBooksLoadFailed, setBoughtBooksLoadFailed] = useState(false);
 
+  const debouncedTitleSearch = useDebounce(bookTitle, 500);
+  const hasDuplicateTitle =
+    debouncedTitleSearch.trim() !== "" &&
+    uploadedBooks.some(
+      (book) => book.title.trim() === debouncedTitleSearch.trim(),
+    );
+
   const clearBookForm = (form) => {
     form.reset();
+    setBookTitle("");
+    setBookAbstract("");
     setCoverImageUrl("");
     uploadedImages.forEach(({ url }) => URL.revokeObjectURL(url));
     setUploadedImages([]);
     setUploadedImagePreviews([]);
     if (uploadInputRef.current) uploadInputRef.current.value = "";
   };
+
+  useEffect(() => {
+    const title = debouncedTitleSearch.trim();
+    if (!title) {
+      setBookAbstract("");
+      setIsGeneratingAbstract(false);
+      return;
+    }
+
+    let isCurrentRequest = true;
+    setIsGeneratingAbstract(true);
+
+    const generateBookAbstract = async () => {
+      try {
+        const response = await bookAbstractAPI(title);
+        if (isCurrentRequest) {
+          setBookAbstract(response.data.content);
+        }
+      } catch (error) {
+        if (isCurrentRequest) {
+          toast.error(
+            error?.response?.data?.message ||
+              "Could not generate the book abstract.",
+          );
+        }
+      } finally {
+        if (isCurrentRequest) {
+          setIsGeneratingAbstract(false);
+        }
+      }
+    };
+
+    generateBookAbstract();
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [debouncedTitleSearch]);
 
   useEffect(() => {
     const syncUser = () => {
@@ -348,27 +399,47 @@ function Profile() {
                     }
                     placeholder={placeholder}
                     value={
-                      label === "Cover image URL" ? coverImageUrl : undefined
-                    }
-                    onChange={
                       label === "Cover image URL"
-                        ? (event) => setCoverImageUrl(event.target.value)
-                        : undefined
+                        ? coverImageUrl
+                        : label === "Title"
+                          ? bookTitle
+                          : undefined
                     }
+                    onChange={(event) => {
+                      if (label === "Cover image URL") {
+                        setCoverImageUrl(event.target.value);
+                      } else if (label === "Title") {
+                        setBookTitle(event.target.value);
+                      }
+                    }}
                     min={type === "number" ? "0" : undefined}
                     required
                     className="w-full rounded-md border border-blue-200 bg-white p-2.5 text-gray-700 outline-none placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-300"
                   />
                 </label>
               ))}
+              {hasDuplicateTitle && (
+                <p
+                  className="text-sm text-amber-200 md:col-span-2"
+                  role="status"
+                >
+                  You have already listed a book with this title.
+                </p>
+              )}
 
               <label className="m-1 block text-sm font-medium text-white md:col-span-2">
                 <span className="mb-1.5 block">Abstract</span>
                 <textarea
                   name="abstract"
-                  placeholder="What should readers know about this book?"
+                  placeholder={
+                    isGeneratingAbstract
+                      ? "Generating abstract..."
+                      : "What should readers know about this book?"
+                  }
                   rows="4"
                   required
+                  value={bookAbstract}
+                  onChange={(event) => setBookAbstract(event.target.value)}
                   className="w-full resize-y rounded-md border border-blue-200 bg-white p-2.5 text-gray-700 outline-none placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-300"
                 />
               </label>
@@ -459,14 +530,18 @@ function Profile() {
         <section className="mx-auto mb-12 mt-8 w-full max-w-5xl px-4 sm:px-6">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Your listed books</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Your listed books
+              </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Review the books you have put up for sale and their approval status.
+                Review the books you have put up for sale and their approval
+                status.
               </p>
             </div>
             {!isLoadingUploadedBooks && uploadedBooks.length > 0 && (
               <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-                {uploadedBooks.length} {uploadedBooks.length === 1 ? "book" : "books"}
+                {uploadedBooks.length}{" "}
+                {uploadedBooks.length === 1 ? "book" : "books"}
               </span>
             )}
           </div>
@@ -496,7 +571,8 @@ function Profile() {
                 You haven&apos;t listed any books yet
               </h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
-                Books you add for sale will appear here, along with their review status.
+                Books you add for sale will appear here, along with their review
+                status.
               </p>
               <button
                 type="button"
@@ -520,8 +596,8 @@ function Profile() {
                     : status === "sold"
                       ? "bg-slate-100 text-slate-700 ring-slate-200"
                       : status === "rejected"
-                      ? "bg-red-50 text-red-700 ring-red-200"
-                      : "bg-amber-50 text-amber-700 ring-amber-200";
+                        ? "bg-red-50 text-red-700 ring-red-200"
+                        : "bg-amber-50 text-amber-700 ring-amber-200";
                 const imageUrl =
                   book.CoverImageUrl ||
                   (book.uploadImages?.[0]
@@ -547,8 +623,13 @@ function Profile() {
                           />
                         ) : (
                           <div className="flex h-48 w-32 flex-col items-center justify-center gap-2 rounded-md bg-blue-100 text-blue-700">
-                            <FontAwesomeIcon icon={faBookOpen} className="text-3xl" />
-                            <span className="px-2 text-center text-xs">No cover image</span>
+                            <FontAwesomeIcon
+                              icon={faBookOpen}
+                              className="text-3xl"
+                            />
+                            <span className="px-2 text-center text-xs">
+                              No cover image
+                            </span>
                           </div>
                         )}
                       </div>
@@ -577,20 +658,27 @@ function Profile() {
                               className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <FontAwesomeIcon icon={faTrashCan} />
-                              {deletingBookId === book._id ? "Deleting..." : "Delete"}
+                              {deletingBookId === book._id
+                                ? "Deleting..."
+                                : "Delete"}
                             </button>
                           </div>
                         </div>
 
                         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                          <span className="font-semibold text-blue-700">{price}</span>
+                          <span className="font-semibold text-blue-700">
+                            {price}
+                          </span>
                           {book.discountPrice != null && (
                             <span className="text-gray-500">
                               Discount price:{" "}
-                              {Number(book.discountPrice).toLocaleString("en-IN", {
-                                style: "currency",
-                                currency: "INR",
-                              })}
+                              {Number(book.discountPrice).toLocaleString(
+                                "en-IN",
+                                {
+                                  style: "currency",
+                                  currency: "INR",
+                                },
+                              )}
                             </span>
                           )}
                           {book.category && (
@@ -608,7 +696,9 @@ function Profile() {
 
                         {(book.publisher || book.pages || book.language) && (
                           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-xs text-gray-500">
-                            {book.publisher && <span>Publisher: {book.publisher}</span>}
+                            {book.publisher && (
+                              <span>Publisher: {book.publisher}</span>
+                            )}
                             {book.pages && <span>{book.pages} pages</span>}
                             {book.language && <span>{book.language}</span>}
                           </div>
@@ -633,11 +723,14 @@ function Profile() {
                 Books you have purchased from other sellers.
               </p>
             </div>
-            {!isLoadingBoughtBooks && !boughtBooksLoadFailed && boughtBooks.length > 0 && (
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-                {boughtBooks.length} {boughtBooks.length === 1 ? "book" : "books"}
-              </span>
-            )}
+            {!isLoadingBoughtBooks &&
+              !boughtBooksLoadFailed &&
+              boughtBooks.length > 0 && (
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+                  {boughtBooks.length}{" "}
+                  {boughtBooks.length === 1 ? "book" : "books"}
+                </span>
+              )}
           </div>
 
           {isLoadingBoughtBooks ? (
@@ -696,7 +789,10 @@ function Profile() {
                           />
                         ) : (
                           <div className="flex h-48 w-32 flex-col items-center justify-center gap-2 rounded-md bg-blue-100 text-blue-700">
-                            <FontAwesomeIcon icon={faBookOpen} className="text-3xl" />
+                            <FontAwesomeIcon
+                              icon={faBookOpen}
+                              className="text-3xl"
+                            />
                             <span className="px-2 text-center text-xs">
                               No cover image
                             </span>

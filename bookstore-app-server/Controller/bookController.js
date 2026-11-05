@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 
 const stripe = require("stripe")(process.env.STRIPEKEY);
 
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
 exports.addBookController = async (req, res) => {
   console.log("inside add book controller");
 
@@ -248,10 +250,40 @@ exports.approveBooksController = async (req, res) => {
   console.log("inside approveBooksController");
 
   const { id } = req.params;
-  const book = await books.findByIdAndUpdate(
-    id,
-    { status: "approved" },
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ message: "Invalid book ID." });
+  }
+
+  const book = await books.findOneAndUpdate(
+    { _id: id, status: { $ne: "sold" } },
+    { $set: { status: "approved" } },
+    { new: true },
   );
-  if (!book) return res.status(404).json({ message: "Book not found." });
+  if (!book) {
+    const existingBook = await books.findById(id);
+    if (!existingBook) {
+      return res.status(404).json({ message: "Book not found." });
+    }
+    return res.status(409).json({ message: "A sold book cannot be approved." });
+  }
   return res.status(200).json(book);
+};
+
+exports.genarateBookAbstractController = async (req, res) => {
+  console.log("Inside genarateBookAbstractController");
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API);
+  const { title } = req.body;
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3.5-flash",
+  });
+  const result = await model.generateContent(
+    `Give me a short Abstract of the book ${title} as plain text`,
+  );
+  const reply = result.response;
+  res.status(200).json({
+    success: true,
+    content: reply.candidates[0].content.parts[0].text,
+  });
+  console.log(result);
 };

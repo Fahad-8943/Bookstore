@@ -140,7 +140,11 @@ function Resource() {
                     <p className="text-blue-500">₹ {book.price}</p>
 
                     {/* APPROVE BUTTON */}
-                    {book.status === "approved" ? (
+                    {book.status === "sold" ? (
+                      <p className="mt-3 w-full rounded bg-gray-100 py-2 text-xs font-semibold text-gray-700">
+                        Sold
+                      </p>
+                    ) : book.status === "approved" ? (
                       <p className="mt-3 w-full rounded bg-green-100 py-2 text-xs font-semibold text-green-700">
                         Approved
                       </p>
