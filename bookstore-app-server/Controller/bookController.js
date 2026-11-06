@@ -154,10 +154,9 @@ exports.bookPaymentController = async (req, res) => {
     return res.status(400).json({ message: "This book has an invalid price." });
   }
 
-  const clientUrl = (process.env.CLIENT_URL || "http://localhost:5173").replace(
-    /\/$/,
-    "",
-  );
+  const clientUrl = (
+    process.env.CLIENT_URL || "https://bookstore-murex-iota.vercel.app/"
+  ).replace(/\/$/, "");
   const session = await stripe.checkout.sessions.create({
     line_items: [
       {
