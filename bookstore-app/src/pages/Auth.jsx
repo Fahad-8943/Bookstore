@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import * as Yup from "yup";
 import { useFormik } from "formik";
@@ -9,6 +9,7 @@ import { useNavigate } from "react-router";
 import { toast } from "react-toastify";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
+import { routerContext } from "../context/RouterGuardContext";
 
 const getApiErrorMessage = (result, fallback) => {
   const data = result.response?.data;
@@ -18,6 +19,8 @@ const getApiErrorMessage = (result, fallback) => {
 };
 
 function Auth({ register }) {
+  const { setAuthorizedUser, setRole } = useContext(routerContext);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
@@ -60,7 +63,9 @@ function Auth({ register }) {
       toast.success("Registration successful. Please log in.");
       navigate("/login");
     } else {
-      toast.error(getApiErrorMessage(result, "Registration failed. Please try again."));
+      toast.error(
+        getApiErrorMessage(result, "Registration failed. Please try again."),
+      );
     }
   };
   const handleLogin = async (userData) => {
@@ -69,14 +74,20 @@ function Auth({ register }) {
       toast.success("Login successful.");
       sessionStorage.setItem("user", JSON.stringify(result.data.user));
       sessionStorage.setItem("token", result.data.token);
+      setAuthorizedUser(true);
+
       window.dispatchEvent(new Event("auth-change"));
       if (result.data.user.role === "admin") {
         navigate("/admin-dashboard");
+        setRole("admin");
       } else {
         navigate("/");
+        setRole("user");
       }
     } else {
-      toast.error(getApiErrorMessage(result, "Login failed. Please try again."));
+      toast.error(
+        getApiErrorMessage(result, "Login failed. Please try again."),
+      );
     }
   };
   const handleGoogleLogin = async (credentialResponse) => {
@@ -90,13 +101,18 @@ function Auth({ register }) {
       });
 
       if (result.status !== 200 || !result.data?.user || !result.data?.token) {
-        toast.error(getApiErrorMessage(result, "Google login failed. Please try again."));
+        toast.error(
+          getApiErrorMessage(result, "Google login failed. Please try again."),
+        );
         return;
       }
 
       toast.success("Login successful.");
       sessionStorage.setItem("user", JSON.stringify(result.data.user));
       sessionStorage.setItem("token", result.data.token);
+      setAuthorizedUser(true);
+      setRole(result.data.user.role);
+
       window.dispatchEvent(new Event("auth-change"));
       navigate(result.data.user.role === "admin" ? "/admin-dashboard" : "/");
     } catch {
